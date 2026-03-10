@@ -1,0 +1,66 @@
+# Symphony - Production Docker Compose
+# Uses pre-built release for smaller image size
+
+services:
+  symphony:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: symphony
+    restart: unless-stopped
+    
+    environment:
+      # Required: Linear API key - set this in Dokploy!
+      - LINEAR_API_KEY=${LINEAR_API_KEY}
+      
+      # Optional: Project slug (can also be in WORKFLOW.md)
+      - LINEAR_PROJECT_SLUG=${LINEAR_PROJECT_SLUG}
+      
+      # Optional: Custom workspace root
+      - SYMPHONY_WORKSPACE_ROOT=/app/workspaces
+      
+      # Elixir runtime config
+      - RELEASE_DISTRIBUTION=sname
+      - RELEASE_NODE=symphony@localhost
+      
+    volumes:
+      # Persist workspaces
+      - symphony-workspaces:/app/workspaces
+      # Persist logs  
+      - symphony-logs:/app/log
+      
+    networks:
+      - proxy-net
+      - dokploy-network
+      
+    labels:
+      # TSDProxy for Tailscale access
+      - "tsdproxy.enable=true"
+      - "tsdproxy.name=symphony"
+      - "tsdproxy.port=4000"
+      
+      # Dokploy metadata
+      - "dokploy.app=true"
+      - "dokploy.type=compose"
+      
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/api/v1/state"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+      
+volumes:
+  symphony-workspaces:
+    driver: local
+  symphony-logs:
+    driver: local
+
+networks:
+  proxy-net:
+    external: true
+    name: proxy-net
+  dokploy-network:
+    external: true
+    name: dokploy-network
