@@ -1,5 +1,5 @@
-# Symphony - Production Docker Compose
-# Uses pre-built release for smaller image size
+# Symphony - Production Docker Compose (GitHub source)
+# Pulls from: https://github.com/D5V1N2/symphony-dokploy
 
 services:
   symphony:
