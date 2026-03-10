@@ -1,43 +1,65 @@
 services:
   symphony:
-    build:
-      context: https://github.com/D5V1N2/symphony-dokploy.git#main
-      dockerfile: Dockerfile
+    image: hexpm/elixir:1.18.2-erlang-27.2.4-ubuntu-noble-20250127
     container_name: symphony
     restart: unless-stopped
-    
+    command:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        echo "=== Installing dependencies ==="
+        apt-get update && apt-get install -y git curl build-essential ca-certificates gnupg
+        
+        echo "=== Installing Node.js ==="
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+        apt-get install -y nodejs
+        
+        echo "=== Installing Codex CLI ==="
+        npm install -g @openai/codex
+        
+        echo "=== Setting up Symphony ==="
+        if [ ! -d /opt/symphony ]; then
+          git clone https://github.com/openai/symphony.git /opt/symphony
+          cd /opt/symphony/elixir
+          curl https://mise.run | sh
+          export PATH="/root/.local/bin:$PATH"
+          mise trust && mise install
+          mise exec -- mix deps.get
+          mise exec -- mix compile
+          mise exec -- mix release --overwrite
+        fi
+        
+        echo "=== Downloading WORKFLOW.md ==="
+        mkdir -p /app/config
+        curl -sL https://raw.githubusercontent.com/D5V1N2/symphony-dokploy/main/WORKFLOW.md -o /app/config/WORKFLOW.md
+        
+        echo "=== Starting Symphony ==="
+        cd /opt/symphony/elixir
+        export PATH="/root/.local/bin:$PATH"
+        exec mise exec -- /opt/symphony/elixir/_build/dev/rel/symphony/bin/symphony /app/config/WORKFLOW.md --port 4000 --logs-root /app/log
     environment:
-      # Required: Linear API key
       - LINEAR_API_KEY=${LINEAR_API_KEY}
-      # Required: Linear project slug  
       - LINEAR_PROJECT_SLUG=${LINEAR_PROJECT_SLUG}
-      # Optional: OpenAI API key (for Codex authentication)
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      # Workspace location
       - SYMPHONY_WORKSPACE_ROOT=/app/workspaces
-      
     volumes:
-      # Persist workspaces (where repos are cloned)
+      - symphony-code:/opt/symphony
       - symphony-workspaces:/app/workspaces
-      # Persist logs
       - symphony-logs:/app/log
-      # Optional: Override WORKFLOW.md with custom config
-      # - ./custom-workflow.md:/app/config/WORKFLOW.md:ro
-      
     networks:
       - proxy-net
       - dokploy-network
-      
     labels:
-      # TSDProxy for Tailscale magic DNS
       - "tsdproxy.enable=true"
       - "tsdproxy.name=symphony"
       - "tsdproxy.port=4000"
-      
     ports:
       - "4000:4000"
       
 volumes:
+  symphony-code:
+    driver: local
   symphony-workspaces:
     driver: local
   symphony-logs:
