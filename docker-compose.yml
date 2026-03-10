@@ -1,57 +1,60 @@
-# Symphony - Production Docker Compose (GitHub source)
-# Pulls from: https://github.com/D5V1N2/symphony-dokploy
+# Symphony - Simple Docker Compose
+# Uses pre-built Elixir image and runs setup on start
 
 services:
   symphony:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: hexpm/elixir:1.18.2-erlang-27.2.4-ubuntu-noble-20250127
     container_name: symphony
     restart: unless-stopped
+    command: >
+      bash -c "
+        apt-get update && apt-get install -y git curl build-essential &&
+        curl https://mise.run | sh &&
+        export PATH=\"/root/.local/bin:\$PATH\" &&
+        cd /app &&
+        if [ ! -d symphony ]; then
+          git clone https://github.com/openai/symphony.git .&&
+          cd elixir &&
+          mise trust && mise install &&
+          mise exec -- mix deps.get &&
+          mise exec -- mix compile
+        fi &&
+        cd /app/elixir &&
+        mise exec -- ./bin/symphony /app/config/WORKFLOW.md --port 4000 --logs-root /app/log
+      "
     
     environment:
-      # Required: Linear API key - set this in Dokploy!
       - LINEAR_API_KEY=${LINEAR_API_KEY}
-      
-      # Optional: Project slug (can also be in WORKFLOW.md)
       - LINEAR_PROJECT_SLUG=${LINEAR_PROJECT_SLUG}
-      
-      # Optional: Custom workspace root
       - SYMPHONY_WORKSPACE_ROOT=/app/workspaces
       
-      # Elixir runtime config
-      - RELEASE_DISTRIBUTION=sname
-      - RELEASE_NODE=symphony@localhost
-      
     volumes:
-      # Persist workspaces
+      - symphony-code:/app
       - symphony-workspaces:/app/workspaces
-      # Persist logs  
       - symphony-logs:/app/log
+      - ./WORKFLOW.md:/app/config/WORKFLOW.md:ro
       
     networks:
       - proxy-net
       - dokploy-network
       
     labels:
-      # TSDProxy for Tailscale access
       - "tsdproxy.enable=true"
       - "tsdproxy.name=symphony"
       - "tsdproxy.port=4000"
-      
-      # Dokploy metadata
       - "dokploy.app=true"
       - "dokploy.type=compose"
       
-    # Health check
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/api/v1/state"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 120s
       
 volumes:
+  symphony-code:
+    driver: local
   symphony-workspaces:
     driver: local
   symphony-logs:
