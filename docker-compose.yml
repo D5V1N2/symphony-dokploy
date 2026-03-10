@@ -1,6 +1,52 @@
 services:
-  test:
-    image: nginx:alpine
-    container_name: symphony-test
+  symphony:
+    build:
+      context: https://github.com/D5V1N2/symphony-dokploy.git#main
+      dockerfile: Dockerfile
+    container_name: symphony
+    restart: unless-stopped
+    
+    environment:
+      # Required: Linear API key
+      - LINEAR_API_KEY=${LINEAR_API_KEY}
+      # Required: Linear project slug  
+      - LINEAR_PROJECT_SLUG=${LINEAR_PROJECT_SLUG}
+      # Optional: OpenAI API key (for Codex authentication)
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # Workspace location
+      - SYMPHONY_WORKSPACE_ROOT=/app/workspaces
+      
+    volumes:
+      # Persist workspaces (where repos are cloned)
+      - symphony-workspaces:/app/workspaces
+      # Persist logs
+      - symphony-logs:/app/log
+      # Optional: Override WORKFLOW.md with custom config
+      # - ./custom-workflow.md:/app/config/WORKFLOW.md:ro
+      
+    networks:
+      - proxy-net
+      - dokploy-network
+      
+    labels:
+      # TSDProxy for Tailscale magic DNS
+      - "tsdproxy.enable=true"
+      - "tsdproxy.name=symphony"
+      - "tsdproxy.port=4000"
+      
     ports:
-      - "8080:80"
+      - "4000:4000"
+      
+volumes:
+  symphony-workspaces:
+    driver: local
+  symphony-logs:
+    driver: local
+
+networks:
+  proxy-net:
+    external: true
+    name: proxy-net
+  dokploy-network:
+    external: true
+    name: dokploy-network
