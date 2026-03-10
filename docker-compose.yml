@@ -4,14 +4,3 @@ services:
     container_name: symphony-test
     ports:
       - "8080:80"
-    networks:
-      - proxy-net
-    labels:
-      - "tsdproxy.enable=true"
-      - "tsdproxy.name=symphony-test"
-      - "tsdproxy.port=80"
-      
-networks:
-  proxy-net:
-    external: true
-    name: proxy-net
