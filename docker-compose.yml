@@ -11,9 +11,13 @@ services:
         apt-get update && apt-get install -y git curl build-essential &&
         curl https://mise.run | sh &&
         export PATH=\"/root/.local/bin:\$PATH\" &&
+        mkdir -p /app/config &&
+        if [ ! -f /app/config/WORKFLOW.md ]; then
+          curl -sL https://raw.githubusercontent.com/D5V1N2/symphony-dokploy/main/WORKFLOW.md -o /app/config/WORKFLOW.md
+        fi &&
         cd /app &&
         if [ ! -d symphony ]; then
-          git clone https://github.com/openai/symphony.git .&&
+          git clone https://github.com/openai/symphony.git &&
           cd elixir &&
           mise trust && mise install &&
           mise exec -- mix deps.get &&
@@ -32,7 +36,7 @@ services:
       - symphony-code:/app
       - symphony-workspaces:/app/workspaces
       - symphony-logs:/app/log
-      - ./WORKFLOW.md:/app/config/WORKFLOW.md:ro
+      # WORKFLOW.md is built into the volume on first run
       
     networks:
       - proxy-net
