@@ -3,41 +3,30 @@ services:
     image: hexpm/elixir:1.18.2-erlang-27.2.4-ubuntu-noble-20250127
     container_name: symphony
     restart: unless-stopped
-    command:
-      - /bin/bash
-      - -c
-      - |
-        set -e
-        echo "=== Installing dependencies ==="
-        apt-get update && apt-get install -y git curl build-essential ca-certificates gnupg
-        
-        echo "=== Installing Node.js ==="
-        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-        apt-get install -y nodejs
-        
-        echo "=== Installing Codex CLI ==="
-        npm install -g @openai/codex
-        
-        echo "=== Setting up Symphony ==="
-        if [ ! -d /opt/symphony ]; then
-          git clone https://github.com/openai/symphony.git /opt/symphony
-          cd /opt/symphony/elixir
-          curl https://mise.run | sh
-          export PATH="/root/.local/bin:$PATH"
-          mise trust && mise install
-          mise exec -- mix deps.get
-          mise exec -- mix compile
-          mise exec -- mix release --overwrite
-        fi
-        
-        echo "=== Downloading WORKFLOW.md ==="
-        mkdir -p /app/config
-        curl -sL https://raw.githubusercontent.com/D5V1N2/symphony-dokploy/main/WORKFLOW.md -o /app/config/WORKFLOW.md
-        
-        echo "=== Starting Symphony ==="
-        cd /opt/symphony/elixir
-        export PATH="/root/.local/bin:$PATH"
-        exec mise exec -- /opt/symphony/elixir/_build/dev/rel/symphony/bin/symphony /app/config/WORKFLOW.md --port 4000 --logs-root /app/log
+    command: >
+      bash -c "
+        apt-get update && apt-get install -y git curl build-essential ca-certificates gnupg &&
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash - &&
+        apt-get install -y nodejs &&
+        npm install -g @openai/codex &&
+        if [ ! -d /opt/symphony/.git ]; then
+          git clone https://github.com/openai/symphony.git /opt/symphony &&
+          cd /opt/symphony/elixir &&
+          curl https://mise.run | sh &&
+          export PATH=/root/.local/bin:\$PATH &&
+          export MIX_ENV=prod &&
+          mise trust && mise install &&
+          mise exec -- mix deps.get &&
+          mise exec -- mix compile &&
+          mise exec -- mix release --overwrite;
+        fi &&
+        mkdir -p /app/config &&
+        curl -sL https://raw.githubusercontent.com/D5V1N2/symphony-dokploy/main/WORKFLOW.md -o /app/config/WORKFLOW.md &&
+        cd /opt/symphony/elixir &&
+        export PATH=/root/.local/bin:\$PATH &&
+        export MIX_ENV=prod &&
+        exec mise exec -- /opt/symphony/elixir/_build/prod/rel/symphony_elixir/bin/symphony_elixir start
+      "
     environment:
       - LINEAR_API_KEY=${LINEAR_API_KEY}
       - LINEAR_PROJECT_SLUG=${LINEAR_PROJECT_SLUG}
@@ -56,19 +45,14 @@ services:
       - "tsdproxy.port=4000"
     ports:
       - "4000:4000"
-      
+
 volumes:
   symphony-code:
-    driver: local
   symphony-workspaces:
-    driver: local
   symphony-logs:
-    driver: local
 
 networks:
   proxy-net:
     external: true
-    name: proxy-net
   dokploy-network:
     external: true
-    name: dokploy-network
